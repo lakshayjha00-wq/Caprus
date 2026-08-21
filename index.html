@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GODSEYE</title>
+  <meta name="description" content="Explore the entire world in 3D with satellite imagery, terrain, buildings, landmarks, and street-level detail. A Google Earth-like experience in your browser.">
+
+  <!-- CesiumJS -->
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Loading Screen -->
+  <div id="loadingScreen">
+    <div class="loader-content">
+      <div class="globe-spinner">
+        <div class="ring ring1"></div>
+        <div class="ring ring2"></div>
+        <div class="ring ring3"></div>
+        <div class="globe-icon">🌍</div>
+      </div>
+      <h1 class="loader-title">GODSEYE</h1>
+      <p class="loader-subtitle">WE SEE EVERYTHING</p>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <span class="progress-text" id="progressText">Initializing...</span>
+    </div>
+  </div>
+
+  <!-- Cesium Globe Container -->
+  <div id="cesiumContainer"></div>
+
+  <!-- Top Bar -->
+  <header id="topBar">
+    <div class="top-left">
+      <div class="brand">
+        <span class="brand-icon">🌍</span>
+        <span class="brand-text">GODSEYE</span>
+      </div>
+    </div>
+    <div class="top-center">
+      <div class="search-container" id="searchContainer">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input type="text" id="searchInput" placeholder="Search cities, landmarks, streets..." autocomplete="off" spellcheck="false">
+        <kbd class="search-shortcut">Ctrl+K</kbd>
+        <button class="search-clear" id="searchClear" style="display:none;">✕</button>
+        <div class="search-results" id="searchResults"></div>
+      </div>
+    </div>
+    <div class="top-right">
+      <div class="coord-display" id="coordDisplay">
+        <span id="coordLat">—</span> · <span id="coordLon">—</span> · <span id="coordAlt">—</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Side Panel -->
+  <aside id="sidePanel" class="collapsed">
+    <button class="panel-toggle" id="panelToggle">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="toggle-icon">
+        <path d="M9 18l6-6-6-6"/>
+      </svg>
+    </button>
+    <div class="panel-content">
+      <h2 class="panel-title">Layers &amp; Controls</h2>
+
+      <!-- Map Style -->
+      <div class="panel-section">
+        <h3 class="section-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+          Map Style
+        </h3>
+        <div class="style-grid" id="styleGrid">
+          <button class="style-btn active" data-style="photorealistic">
+              <span class="style-preview satellite-preview"></span>
+              <span>Google Earth 3D</span>
+            </button>
+          <button class="style-btn" data-style="streets">
+            <span class="style-preview streets-preview"></span>
+            <span>Streets</span>
+          </button>
+          <button class="style-btn" data-style="dark">
+            <span class="style-preview dark-preview"></span>
+            <span>Dark</span>
+          </button>
+          <button class="style-btn" data-style="terrain">
+            <span class="style-preview terrain-preview"></span>
+            <span>Terrain</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Layers -->
+      <div class="panel-section">
+        <h3 class="section-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          Layers
+        </h3>
+        <label class="toggle-row">
+          <span>3D Buildings</span>
+          <input type="checkbox" id="toggleBuildings" checked>
+          <span class="toggle-switch"></span>
+        </label>
+        <label class="toggle-row">
+          <span>3D Terrain</span>
+          <input type="checkbox" id="toggleTerrain" checked>
+          <span class="toggle-switch"></span>
+</label>
+        <label class="toggle-row">
+          <span>Atmosphere</span>
+          <input type="checkbox" id="toggleAtmosphere" checked>
+          <span class="toggle-switch"></span>
+        </label>
+        <label class="toggle-row">
+          <span>Day/Night</span>
+          <input type="checkbox" id="toggleDayNight">
+          <span class="toggle-switch"></span>
+        </label>
+        <label class="toggle-row">
+          <span>Lat/Lon Lines</span>
+          <input type="checkbox" id="toggleGrid" checked>
+          <span class="toggle-switch"></span>
+        </label>
+        <label class="toggle-row" style="color: #4ade80; font-weight: 600;">
+          <span>Live Flights ✈️</span>
+          <input type="checkbox" id="toggleFlights">
+          <span class="toggle-switch"></span>
+        </label>
+        <div class="toggle-subrow" style="margin: -6px 0 10px 24px; display: none; align-items: center; gap: 8px;" id="flightSourceContainer">
+          <span style="font-size: 11px; color: #94a3b8; font-weight: 500;">Sensors:</span>
+          <select id="flightSource" style="background: #0f172a; color: #4ade80; border: 1px solid #334155; border-radius: 4px; padding: 2px 6px; font-size: 11px; font-weight: 600; outline: none; cursor: pointer;">
+            <option value="auto">Auto (FR24 → OpenSky) ⚡</option>
+            <option value="opensky">OpenSky Network 📡</option>
+            <option value="fr24">FlightRadar24 🛰️</option>
+          </select>
+          <span id="flightFeedStatus" style="font-size: 10px; color: #64748b; margin-left: 4px;"></span>
+        </div>
+        <label class="toggle-row" style="color: #38bdf8; font-weight: 600;">
+          <span>Live Maritime 🚢</span>
+          <input type="checkbox" id="toggleMaritime">
+          <span class="toggle-switch"></span>
+        </label>
+        <div class="toggle-subrow" style="margin: -6px 0 10px 24px; display: none; flex-direction: column; align-items: flex-start; gap: 6px;" id="maritimeOptionsContainer">
+          <label class="toggle-row" style="color: #7dd3fc; font-weight: 500; font-size: 12px;">
+            <span>Shipping lanes</span>
+            <input type="checkbox" id="toggleShippingRoutes" checked>
+            <span class="toggle-switch"></span>
+          </label>
+          <span id="maritimeFeedStatus" style="font-size: 10px; color: #64748b;"></span>
+        </div>
+        <label class="toggle-row" style="color: #60a5fa; font-weight: 600;">
+          <span>Airspaces</span>
+          <input type="checkbox" id="toggleAirspaces">
+          <span class="toggle-switch"></span>
+        </label>
+        <label class="toggle-row" style="color: #fbbf24; font-weight: 600;">
+          <span>Live Satellites 🛰️</span>
+          <input type="checkbox" id="toggleSatellites">
+          <span class="toggle-switch"></span>
+        </label>
+        <label class="toggle-row" style="color: #c084fc; font-weight: 600;">
+          <span>XYZ Orbital Grid 🌐</span>
+          <input type="checkbox" id="toggleXYZGrid">
+          <span class="toggle-switch"></span>
+        </label>
+        <label class="toggle-row">
+          <span>Shadows</span>
+          <input type="checkbox" id="toggleShadows">
+          <span class="toggle-switch"></span>
+        </label>
+        <label class="toggle-row" style="color: #f43f5e; font-weight: 600;">
+          <span>Live Traffic 🚦</span>
+          <input type="checkbox" id="toggleTraffic">
+          <span class="toggle-switch"></span>
+        </label>
+        <label class="toggle-row" style="color: #ff5252; font-weight: 600;">
+          <span>Crisis Zones</span>
+          <input type="checkbox" id="toggleCrisisZones" checked>
+          <span class="toggle-switch"></span>
+        </label>
+        <label class="toggle-row" style="color: #ff1744; font-weight: 600;">
+          <span>Thermal Indicators</span>
+          <input type="checkbox" id="toggleThermalMap" checked>
+          <span class="toggle-switch"></span>
+        </label>
+        <label class="toggle-row" style="color: #ffea00; font-weight: 600;">
+          <span>Tactical Highlights</span>
+          <input type="checkbox" id="toggleTacticalMap" checked>
+          <span class="toggle-switch"></span>
+        </label>
+      </div>
+
+      <!-- Quick Fly-To -->
+      <div class="panel-section">
+        <h3 class="section-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+          Quick Fly-To
+        </h3>
+        <div class="flyto-grid" id="flytoGrid">
+          <button class="flyto-btn" data-lat="48.8584" data-lon="2.2945" data-alt="800" data-name="Eiffel Tower">🗼 Eiffel Tower</button>
+          <button class="flyto-btn" data-lat="40.6892" data-lon="-74.0445" data-alt="600" data-name="Statue of Liberty">🗽 Statue of Liberty</button>
+          <button class="flyto-btn" data-lat="27.1751" data-lon="78.0421" data-alt="500" data-name="Taj Mahal">🕌 Taj Mahal</button>
+          <button class="flyto-btn" data-lat="29.9792" data-lon="31.1342" data-alt="1500" data-name="Pyramids of Giza">🏛️ Pyramids of Giza</button>
+          <button class="flyto-btn" data-lat="41.8902" data-lon="12.4922" data-alt="600" data-name="Colosseum">🏟️ Colosseum</button>
+          <button class="flyto-btn" data-lat="35.6762" data-lon="139.6503" data-alt="3000" data-name="Tokyo">🗼 Tokyo</button>
+          <button class="flyto-btn" data-lat="40.4319" data-lon="116.5704" data-alt="2000" data-name="Great Wall of China">🏯 Great Wall</button>
+          <button class="flyto-btn" data-lat="-22.9519" data-lon="-43.2105" data-alt="1500" data-name="Christ the Redeemer">⛪ Christ Redeemer</button>
+          <button class="flyto-btn" data-lat="51.5014" data-lon="-0.1419" data-alt="800" data-name="Big Ben">🕰️ Big Ben</button>
+          <button class="flyto-btn" data-lat="-33.8568" data-lon="151.2153" data-alt="800" data-name="Sydney Opera House">🎭 Sydney Opera</button>
+          <button class="flyto-btn" data-lat="37.8199" data-lon="-122.4783" data-alt="1200" data-name="Golden Gate Bridge">🌉 Golden Gate</button>
+          <button class="flyto-btn" data-lat="28.6139" data-lon="77.2090" data-alt="4000" data-name="New Delhi">🇮🇳 New Delhi</button>
+          <button class="flyto-btn" data-lat="25.1972" data-lon="55.2744" data-alt="1500" data-name="Burj Khalifa">🏙️ Burj Khalifa</button>
+          <button class="flyto-btn" data-lat="-13.1631" data-lon="-72.5450" data-alt="2000" data-name="Machu Picchu">🏔️ Machu Picchu</button>
+          <button class="flyto-btn" data-lat="19.4326" data-lon="-99.1332" data-alt="5000" data-name="Mexico City">🇲🇽 Mexico City</button>
+          <button class="flyto-btn" data-lat="1.2816" data-lon="103.8636" data-alt="2000" data-name="Singapore">🇸🇬 Singapore</button>
+        </div>
+      </div>
+
+      <!-- Camera Info -->
+      <div class="panel-section">
+        <h3 class="section-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Camera
+        </h3>
+        <div class="camera-info">
+          <div class="camera-row"><span>Latitude</span><span id="camLat">—</span></div>
+          <div class="camera-row"><span>Longitude</span><span id="camLon">—</span></div>
+          <div class="camera-row"><span>Altitude</span><span id="camAlt">—</span></div>
+          <div class="camera-row"><span>Heading</span><span id="camHeading">—</span></div>
+          <div class="camera-row"><span>Pitch</span><span id="camPitch">—</span></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Intelligence Dock (Crisis / Tactical / Thermal) -->
+  <aside id="intel-dock">
+    <button type="button" class="intel-dock-toggle" id="intelDockToggle" title="Collapse panel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <header class="intel-dock-header">
+      <h2 class="intel-dock-title">Intelligence</h2>
+      <nav class="intel-tabs" role="tablist">
+        <button type="button" class="intel-tab active" data-tab="crisis" role="tab">Crisis Zones</button>
+        <button type="button" class="intel-tab" data-tab="tactical" role="tab">Tactical</button>
+        <button type="button" class="intel-tab" data-tab="thermal" role="tab">Thermal</button>
+        <button type="button" class="intel-tab" data-tab="traffic" role="tab">Traffic</button>
+        <button type="button" class="intel-tab" data-tab="satcams" role="tab">Sat Cams</button>
+      </nav>
+    </header>
+    <div class="intel-panels">
+      <div id="intel-panel-crisis" class="intel-panel-pane active" role="tabpanel"></div>
+      <div id="intel-panel-tactical" class="intel-panel-pane" role="tabpanel"></div>
+      <div id="intel-panel-thermal" class="intel-panel-pane" role="tabpanel"></div>
+      <div id="intel-panel-traffic" class="intel-panel-pane" role="tabpanel"></div>
+      <div id="intel-panel-satcams" class="intel-panel-pane" role="tabpanel"></div>
+    </div>
+  </aside>
+
+  <!-- Bottom Controls -->
+  <div id="bottomControls">
+    <button class="ctrl-btn" id="btnZoomIn" title="Zoom In">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+    <button class="ctrl-btn" id="btnZoomOut" title="Zoom Out">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+    <div class="ctrl-divider"></div>
+    <button class="ctrl-btn" id="btnHome" title="Home View">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    </button>
+    <button class="ctrl-btn" id="btnNorth" title="Face North">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="12,2 15,10 12,8 9,10" fill="currentColor"/><path d="M12 8v8"/></svg>
+    </button>
+    <div class="ctrl-divider"></div>
+    <button class="ctrl-btn" id="btnTopDown" title="Top-Down View">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+    </button>
+    <button class="ctrl-btn" id="btnFullscreen" title="Fullscreen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+    </button>
+  </div>
+
+  <!-- Vessel Detail Popup -->
+  <div id="vesselPopup" class="hidden">
+    <button class="popup-close" id="vesselPopupClose">✕</button>
+    <h3 id="vesselPopupTitle">—</h3>
+    <div id="vesselPopupBadge" class="flight-type-badge">—</div>
+    <div class="popup-details" id="vesselPopupDetails"></div>
+    <button class="popup-action" id="vesselPopupFlyTo">🎯 Track Vessel</button>
+  </div>
+
+  <!-- Flight Detail Popup -->
+  <div id="flightPopup" class="hidden">
+    <button class="popup-close" id="flightPopupClose">✕</button>
+    <h3 id="flightPopupTitle">—</h3>
+    <div id="flightPopupBadge" class="flight-type-badge">—</div>
+    <div class="popup-details" id="flightPopupDetails"></div>
+    <button class="popup-action" id="flightPopupFlyTo">🎯 Track Aircraft</button>
+  </div>
+
+  <!-- Satellite Detail Popup -->
+  <div id="satellitePopup" class="hidden">
+    <button class="popup-close" id="satellitePopupClose">✕</button>
+    <h3 id="satPopupTitle">—</h3>
+    <div id="satPopupBadge" class="sat-type-badge">—</div>
+    <div class="popup-details" id="satPopupDetails"></div>
+    <button class="popup-action" id="satPopupFlyTo">🎯 Track Orbit</button>
+  </div>
+
+  <!-- Location Info Popup -->
+  <div id="locationPopup" class="hidden">
+    <button class="popup-close" id="popupClose">✕</button>
+    <h3 id="popupTitle">—</h3>
+    <div class="popup-details">
+      <div class="popup-row"><span>Type</span><span id="popupType">—</span></div>
+      <div class="popup-row"><span>Coordinates</span><span id="popupCoords">—</span></div>
+      <div class="popup-row"><span>Address</span><span id="popupAddress">—</span></div>
+    </div>
+    <button class="popup-action" id="popupFlyTo">🎯 Fly Here</button>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/5.0.0/satellite.min.js"></script>
+  <script src="globe-3d.js?v=2"></script>
+  <script src="app.js?v=12"></script>
+  <script src="intelligence-panel.js?v=2"></script>
+  <script src="maritime-tracker.js?v=1"></script>
+  <script src="satellite-tracker.js?v=3"></script>
+  <script src="satcam-tracker.js?v=1"></script>
+  <script src="traffic-tracker.js?v=1"></script>
+</body>
+</html>
